@@ -104,12 +104,12 @@ impl ChessApp {
 
     fn draw_piece(&self, painter: &egui::Painter, rect: Rect, piece: Piece) {
         let text = match piece.piece_type {
-            PieceType::King => "♔",
-            PieceType::Queen => "♕",
-            PieceType::Rook => "♖",
-            PieceType::Bishop => "♗",
-            PieceType::Knight => "♘",
-            PieceType::Pawn => "♙",
+            PieceType::King => "♚",
+            PieceType::Queen => "♛",
+            PieceType::Rook => "♜",
+            PieceType::Bishop => "♝",
+            PieceType::Knight => "♞",
+            PieceType::Pawn => "♟",
         };
 
         let font_size = rect.height() * 0.8;
