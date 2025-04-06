@@ -92,7 +92,8 @@ impl Board {
 
             // Handle en passant capture
             if piece.piece_type == PieceType::Pawn && Some(to) == self.en_passant_target {
-                let captured_pos = Position::new(from.rank, to.file);
+                let direction = if piece.color == PieceColor::White { 1 } else { -1 };
+                let captured_pos = Position::new((to.rank as i32 + direction) as usize, to.file);
                 if let Some(captured_piece) = self.get_piece(captured_pos) {
                     self.captured_pieces.push(captured_piece);
                     self.set_piece(captured_pos, None);
@@ -201,7 +202,10 @@ impl Board {
                     }
                 }
                 
-                // TODO: En passant capture (not implemented for simplicity)
+                // En passant capture
+                if Some(capture_pos) == self.en_passant_target {
+                    moves.push(ChessMove::new(position, capture_pos));
+                }
             }
         }
     }
