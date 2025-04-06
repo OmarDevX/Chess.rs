@@ -1,5 +1,5 @@
 use eframe::{egui, Frame};
-use egui::{Color32, Pos2, Rect, Sense, Stroke, Vec2};
+use egui::{Color32, Pos2, Rect, Sense, Stroke, Vec2, FontId, Align, Align2};
 
 use crate::chess::{Board, ChessMove, GameState, Piece, PieceColor, PieceType, Position};
 
@@ -53,9 +53,18 @@ impl ChessApp {
                     board_rect.left() + visual_file as f32 * square_size,
                     board_rect.top() + visual_rank as f32 * square_size,
                 );
-                
+
                 let rect = Rect::from_min_size(pos, Vec2::new(square_size, square_size));
                 painter.rect_filled(rect, 0.0, color);
+
+                // Highlight king in check
+                if matches!(self.game_state, GameState::Check | GameState::Checkmate) {
+                    if let Some(king_pos) = self.board.get_king_position(self.board.current_turn()) {
+                        if king_pos.rank == rank && king_pos.file == file {
+                            painter.rect_filled(rect, 0.0, Color32::from_rgba_premultiplied(255, 0, 0, 60));
+                        }
+                    }
+                }
 
                 // Highlight selected square
                 if let Some(selected) = self.selected_position {
@@ -65,22 +74,13 @@ impl ChessApp {
                 }
 
                 // Highlight possible moves
-                if self.selected_position.is_some() {
-                    for chess_move in &self.possible_moves {
-                        let target_rank = if self.board_flipped { 7 - chess_move.to.rank } else { chess_move.to.rank };
-                        let target_file = if self.board_flipped { 7 - chess_move.to.file } else { chess_move.to.file };
-                        
-                        if visual_rank == target_rank && visual_file == target_file {
-                            painter.circle_filled(
-                                rect.center(),
-                                square_size / 6.0,
-                                Color32::from_rgba_premultiplied(100, 100, 100, 100),
-                            );
-                        }
+                for mv in &self.possible_moves {
+                    if mv.to.rank == rank && mv.to.file == file {
+                        painter.circle_filled(rect.center(), square_size / 6.0, Color32::from_rgba_premultiplied(100, 100, 100, 100));
                     }
                 }
 
-                // Draw piece
+                // Draw pieces
                 if let Some(piece) = self.board.get_piece(Position::new(rank, file)) {
                     self.draw_piece(painter, rect, piece);
                 }
@@ -93,57 +93,56 @@ impl ChessApp {
             if let Some(mouse_pos) = response.interact_pointer_pos() {
                 let file = ((mouse_pos.x - board_rect.left()) / square_size) as usize;
                 let rank = ((mouse_pos.y - board_rect.top()) / square_size) as usize;
-                
+
                 let actual_rank = if self.board_flipped { 7 - rank } else { rank };
                 let actual_file = if self.board_flipped { 7 - file } else { file };
-                
+
                 self.handle_square_click(Position::new(actual_rank, actual_file));
             }
         }
     }
 
     fn draw_piece(&self, painter: &egui::Painter, rect: Rect, piece: Piece) {
-        let color = match piece.color {
-            PieceColor::White => Color32::WHITE,
-            PieceColor::Black => Color32::from_rgb(50, 50, 50),
+        let text = match piece.piece_type {
+            PieceType::King => "♔",
+            PieceType::Queen => "♕",
+            PieceType::Rook => "♖",
+            PieceType::Bishop => "♗",
+            PieceType::Knight => "♘",
+            PieceType::Pawn => "♙",
         };
-        let size = rect.width() * 0.6;
-        let center = rect.center();
 
-        match piece.piece_type {
-            PieceType::Pawn => {
-                painter.text(center, egui::Align2::CENTER_CENTER, "♟", egui::FontId::monospace(size), color);
-            }
-            PieceType::Rook => {
-                painter.text(center, egui::Align2::CENTER_CENTER, "♜", egui::FontId::monospace(size), color);
-            }
-            PieceType::Knight => {
-                painter.text(center, egui::Align2::CENTER_CENTER, "♞", egui::FontId::monospace(size), color);
-            }
-            PieceType::Bishop => {
-                painter.text(center, egui::Align2::CENTER_CENTER, "♝", egui::FontId::monospace(size), color);
-            }
-            PieceType::Queen => {
-                painter.text(center, egui::Align2::CENTER_CENTER, "♛", egui::FontId::monospace(size), color);
-            }
-            PieceType::King => {
-                painter.text(center, egui::Align2::CENTER_CENTER, "♚", egui::FontId::monospace(size), color);
-            }
-        }
+        let font_size = rect.height() * 0.8;
+        let font = FontId::monospace(font_size);
+        
+        painter.text(
+            rect.center(),
+            Align2::CENTER_CENTER,
+            text,
+            font,
+            if piece.color == PieceColor::White {
+                Color32::WHITE
+            } else {
+                Color32::BLACK
+            },
+        );
     }
 
     fn handle_square_click(&mut self, pos: Position) {
-        if let Some(selected) = self.selected_position {
-            if let Some(mv) = self.possible_moves.iter().find(|m| m.to == pos) {
+        if self.game_state == GameState::Checkmate {
+            return;
+        }
+
+        if let Some(selected_pos) = self.selected_position {
+            if let Some(mv) = self.possible_moves.iter()
+                .find(|m| m.from == selected_pos && m.to == pos) 
+            {
                 self.board.make_move(*mv);
                 self.board_flipped = !self.board_flipped;
-                self.selected_position = None;
-                self.possible_moves.clear();
                 self.game_state = self.board.check_game_state();
-            } else {
-                self.selected_position = None;
-                self.possible_moves.clear();
             }
+            self.selected_position = None;
+            self.possible_moves.clear();
         } else if let Some(piece) = self.board.get_piece(pos) {
             if piece.color == self.board.current_turn() {
                 self.selected_position = Some(pos);
@@ -155,11 +154,14 @@ impl ChessApp {
     fn draw_game_status(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label(format!("Current turn: {}", self.board.current_turn()));
+            
             match self.game_state {
-                GameState::Check => { ui.label("Check!"); },
-                GameState::Checkmate => { ui.label("Checkmate!"); },
-                GameState::Stalemate => { ui.label("Stalemate!"); },
-                _ => {}
+                GameState::Check => { ui.label("Check!"); }
+                GameState::Checkmate => {
+                    ui.label("Checkmate! Click to restart");
+                }
+                GameState::Stalemate => { ui.label("Stalemate!"); }
+                GameState::InProgress => {}
             }
         });
     }
@@ -171,6 +173,12 @@ impl eframe::App for ChessApp {
             self.draw_game_status(ui);
             ui.separator();
             self.draw_board(ui);
+            
+            if self.game_state == GameState::Checkmate && ui.button("New Game").clicked() {
+                self.board = Board::new();
+                self.board_flipped = false;
+                self.game_state = GameState::InProgress;
+            }
         });
     }
 }

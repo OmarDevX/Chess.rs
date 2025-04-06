@@ -5,11 +5,13 @@ pub struct Board {
     turn: PieceColor,
     move_count: usize,
     captured_pieces: Vec<Piece>,
+    en_passant_target: Option<Position>,
 }
 
 impl Board {
     pub fn new() -> Self {
         let mut board = Self {
+            en_passant_target: None,
             squares: [[None; 8]; 8],
             turn: PieceColor::White,
             move_count: 0,
@@ -88,10 +90,24 @@ impl Board {
                 piece.piece_type = promotion_type;
             }
 
-            // Mark the piece as moved
-            piece.has_moved = true;
+            // Handle en passant capture
+            if piece.piece_type == PieceType::Pawn && Some(to) == self.en_passant_target {
+                let captured_pos = Position::new(from.rank, to.file);
+                if let Some(captured_piece) = self.get_piece(captured_pos) {
+                    self.captured_pieces.push(captured_piece);
+                    self.set_piece(captured_pos, None);
+                }
+            }
 
-            // Move the piece
+            // Set en passant target if pawn moved two squares
+            self.en_passant_target = None;
+            if piece.piece_type == PieceType::Pawn && (from.rank as i32 - to.rank as i32).abs() == 2 {
+                let direction = if piece.color == PieceColor::White { -1 } else { 1 };
+                self.en_passant_target = Some(Position::new((from.rank as i32 + direction) as usize, from.file));
+            }
+
+            // Mark the piece as moved and update position
+            piece.has_moved = true;
             self.set_piece(from, None);
             self.set_piece(to, Some(piece));
 
@@ -368,6 +384,20 @@ impl Board {
         temp_board.is_in_check(color)
     }
 
+    pub fn get_king_position(&self, color: PieceColor) -> Option<Position> {
+        for rank in 0..8 {
+            for file in 0..8 {
+                let pos = Position::new(rank, file);
+                if let Some(piece) = self.get_piece(pos) {
+                    if piece.piece_type == PieceType::King && piece.color == color {
+                        return Some(pos);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub fn check_game_state(&self) -> GameState {
         let current_color = self.turn;
         
@@ -415,6 +445,7 @@ impl Clone for Board {
             turn: self.turn,
             move_count: self.move_count,
             captured_pieces: self.captured_pieces.clone(),
+            en_passant_target: self.en_passant_target,
         }
     }
 }
