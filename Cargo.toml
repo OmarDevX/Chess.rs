@@ -1,0 +1,11 @@
+[package]
+name = "chess_game"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = "0.26.2"
+egui = "0.26.2"
+rand = "0.8.5"
+strum = "0.26"
+strum_macros = "0.26"
