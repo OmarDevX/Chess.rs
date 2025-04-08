@@ -7,6 +7,23 @@ pub struct Position {
 }
 
 impl Position {
+    pub fn from_uci(uci: &str) -> Option<Self> {
+        if uci.len() != 2 {
+            return None;
+        }
+        let mut chars = uci.chars();
+        let file_char = chars.next()?.to_ascii_lowercase();
+        let rank_char = chars.next()?;
+        
+        let file = (file_char as u8).checked_sub(b'a')? as usize;
+        let rank = (rank_char as u8).checked_sub(b'1')? as usize;
+        
+        if file >= 8 || rank >= 8 {
+            return None;
+        }
+        
+        Some(Position { rank, file })
+    }
     pub fn new(rank: usize, file: usize) -> Self {
         assert!(rank < 8, "Rank must be between 0 and 7");
         assert!(file < 8, "File must be between 0 and 7");

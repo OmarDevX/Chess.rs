@@ -7,5 +7,5 @@ edition = "2024"
 eframe = "0.26.2"
 egui = "0.26.2"
 rand = "0.8.5"
-strum = "0.26"
-strum_macros = "0.26"
+strum = { version = "0.26", features = ["derive"] }
+tokio = { version = "1.0", features = ["full"] }

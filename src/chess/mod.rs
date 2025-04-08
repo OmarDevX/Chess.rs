@@ -31,4 +31,25 @@ impl ChessMove {
             promotion: Some(promotion),
         }
     }
+
+    pub fn from_uci(uci: &str) -> Option<Self> {
+        if uci.len() < 4 || uci.len() > 5 {
+            return None;
+        }
+        
+        let from = Position::from_uci(&uci[0..2])?;
+        let to = Position::from_uci(&uci[2..4])?;
+        let promotion = uci.chars().nth(4).and_then(|c| match c {
+            'q' => Some(PieceType::Queen),
+            'r' => Some(PieceType::Rook),
+            'b' => Some(PieceType::Bishop),
+            'n' => Some(PieceType::Knight),
+            _ => None,
+        });
+
+        Some(match promotion {
+            Some(p) => Self::with_promotion(from, to, p),
+            None => Self::new(from, to),
+        })
+    }
 }

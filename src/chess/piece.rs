@@ -1,7 +1,8 @@
 use std::fmt;
-use strum_macros::Display;
+use strum::Display;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
 pub enum PieceColor {
     White,
     Black,
@@ -42,6 +43,23 @@ impl Piece {
         }
     }
 
+    pub fn fen_char(&self) -> char {
+        match (self.piece_type, self.color) {
+            (PieceType::King, PieceColor::White) => 'K',
+            (PieceType::Queen, PieceColor::White) => 'Q',
+            (PieceType::Rook, PieceColor::White) => 'R',
+            (PieceType::Bishop, PieceColor::White) => 'B',
+            (PieceType::Knight, PieceColor::White) => 'N',
+            (PieceType::Pawn, PieceColor::White) => 'P',
+            (PieceType::King, PieceColor::Black) => 'k',
+            (PieceType::Queen, PieceColor::Black) => 'q',
+            (PieceType::Rook, PieceColor::Black) => 'r',
+            (PieceType::Bishop, PieceColor::Black) => 'b',
+            (PieceType::Knight, PieceColor::Black) => 'n',
+            (PieceType::Pawn, PieceColor::Black) => 'p',
+        }
+    }
+
     pub fn to_char(&self) -> char {
         let c = match self.piece_type {
             PieceType::Pawn => 'p',
@@ -58,6 +76,7 @@ impl Piece {
             c
         }
     }
+
 }
 
 impl fmt::Display for Piece {

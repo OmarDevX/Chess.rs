@@ -1,5 +1,7 @@
 mod app;
 mod chess;
+mod game_mode;
+mod stockfish;
 
 use eframe::{egui, NativeOptions};
 

@@ -1,4 +1,5 @@
 use super::{ChessMove, GameState, Piece, PieceColor, PieceType, Position};
+use crate::app::ChessApp;
 
 pub struct Board {
     squares: [[Option<Piece>; 8]; 8],
@@ -9,6 +10,49 @@ pub struct Board {
 }
 
 impl Board {
+    pub fn to_fen(&self) -> String {
+        let mut fen = String::new();
+        let mut empty_count = 0;
+
+        // Piece placement data
+        for rank in (0..8).rev() {
+            for file in 0..8 {
+                if let Some(piece) = self.squares[rank][file] {
+                    if empty_count > 0 {
+                        fen.push_str(&empty_count.to_string());
+                        empty_count = 0;
+                    }
+                    fen.push(piece.fen_char());
+                } else {
+                    empty_count += 1;
+                }
+            }
+            if empty_count > 0 {
+                fen.push_str(&empty_count.to_string());
+                empty_count = 0;
+            }
+            if rank > 0 {
+                fen.push('/');
+            }
+        }
+
+        // Active color
+        fen.push_str(match self.turn {
+            PieceColor::White => " w",
+            PieceColor::Black => " b",
+        });
+
+        // Castling availability
+        fen.push_str(" -"); // Simplified for now
+
+        // En passant target
+        fen.push_str(" -");
+
+        // Halfmove clock and fullmove number
+        fen.push_str(" 0 1");
+
+        fen
+    }
     pub fn new() -> Self {
         let mut board = Self {
             en_passant_target: None,
@@ -24,37 +68,37 @@ impl Board {
     }
 
     pub fn setup_standard_position(&mut self) {
-        // Place pawns
+        // Place pawns (white on rank 2, black on rank 7)
         for file in 0..8 {
-            self.squares[1][file] = Some(Piece::new(PieceType::Pawn, PieceColor::Black));
-            self.squares[6][file] = Some(Piece::new(PieceType::Pawn, PieceColor::White));
+            self.squares[1][file] = Some(Piece::new(PieceType::Pawn, PieceColor::White));
+            self.squares[6][file] = Some(Piece::new(PieceType::Pawn, PieceColor::Black));
         }
 
         // Place rooks
-        self.squares[0][0] = Some(Piece::new(PieceType::Rook, PieceColor::Black));
-        self.squares[0][7] = Some(Piece::new(PieceType::Rook, PieceColor::Black));
-        self.squares[7][0] = Some(Piece::new(PieceType::Rook, PieceColor::White));
-        self.squares[7][7] = Some(Piece::new(PieceType::Rook, PieceColor::White));
+        self.squares[0][0] = Some(Piece::new(PieceType::Rook, PieceColor::White));
+        self.squares[0][7] = Some(Piece::new(PieceType::Rook, PieceColor::White));
+        self.squares[7][0] = Some(Piece::new(PieceType::Rook, PieceColor::Black));
+        self.squares[7][7] = Some(Piece::new(PieceType::Rook, PieceColor::Black));
 
         // Place knights
-        self.squares[0][1] = Some(Piece::new(PieceType::Knight, PieceColor::Black));
-        self.squares[0][6] = Some(Piece::new(PieceType::Knight, PieceColor::Black));
-        self.squares[7][1] = Some(Piece::new(PieceType::Knight, PieceColor::White));
-        self.squares[7][6] = Some(Piece::new(PieceType::Knight, PieceColor::White));
+        self.squares[0][1] = Some(Piece::new(PieceType::Knight, PieceColor::White));
+        self.squares[0][6] = Some(Piece::new(PieceType::Knight, PieceColor::White));
+        self.squares[7][1] = Some(Piece::new(PieceType::Knight, PieceColor::Black));
+        self.squares[7][6] = Some(Piece::new(PieceType::Knight, PieceColor::Black));
 
         // Place bishops
-        self.squares[0][2] = Some(Piece::new(PieceType::Bishop, PieceColor::Black));
-        self.squares[0][5] = Some(Piece::new(PieceType::Bishop, PieceColor::Black));
-        self.squares[7][2] = Some(Piece::new(PieceType::Bishop, PieceColor::White));
-        self.squares[7][5] = Some(Piece::new(PieceType::Bishop, PieceColor::White));
+        self.squares[0][2] = Some(Piece::new(PieceType::Bishop, PieceColor::White));
+        self.squares[0][5] = Some(Piece::new(PieceType::Bishop, PieceColor::White));
+        self.squares[7][2] = Some(Piece::new(PieceType::Bishop, PieceColor::Black));
+        self.squares[7][5] = Some(Piece::new(PieceType::Bishop, PieceColor::Black));
 
         // Place queens
-        self.squares[0][3] = Some(Piece::new(PieceType::Queen, PieceColor::Black));
-        self.squares[7][3] = Some(Piece::new(PieceType::Queen, PieceColor::White));
+        self.squares[0][3] = Some(Piece::new(PieceType::Queen, PieceColor::White));
+        self.squares[7][3] = Some(Piece::new(PieceType::Queen, PieceColor::Black));
 
         // Place kings
-        self.squares[0][4] = Some(Piece::new(PieceType::King, PieceColor::Black));
-        self.squares[7][4] = Some(Piece::new(PieceType::King, PieceColor::White));
+        self.squares[0][4] = Some(Piece::new(PieceType::King, PieceColor::White));
+        self.squares[7][4] = Some(Piece::new(PieceType::King, PieceColor::Black));
     }
 
     pub fn get_piece(&self, position: Position) -> Option<Piece> {
@@ -85,15 +129,25 @@ impl Board {
                 self.captured_pieces.push(captured_piece);
             }
 
-            // Handle pawn promotion
-            if let Some(promotion_type) = chess_move.promotion {
-                piece.piece_type = promotion_type;
+            // Handle pawn promotion (only if moving to promotion rank)
+            if piece.piece_type == PieceType::Pawn {
+                let promotion_rank = match piece.color {
+                    PieceColor::White => 0,
+                    PieceColor::Black => 7,
+                };
+                
+                if to.rank == promotion_rank {
+                    if let Some(promotion_type) = chess_move.promotion {
+                        piece.piece_type = promotion_type;
+                    }
+                } 
             }
 
             // Handle en passant capture
             if piece.piece_type == PieceType::Pawn && Some(to) == self.en_passant_target {
+                // Captured pawn is behind the target square
                 let direction = if piece.color == PieceColor::White { 1 } else { -1 };
-                let captured_pos = Position::new((to.rank as i32 + direction) as usize, to.file);
+                let captured_pos = Position::new((to.rank as i32 - direction) as usize, to.file);
                 if let Some(captured_piece) = self.get_piece(captured_pos) {
                     self.captured_pieces.push(captured_piece);
                     self.set_piece(captured_pos, None);
@@ -103,6 +157,7 @@ impl Board {
             // Set en passant target if pawn moved two squares
             self.en_passant_target = None;
             if piece.piece_type == PieceType::Pawn && (from.rank as i32 - to.rank as i32).abs() == 2 {
+                // White pawns move up (negative direction), Black pawns move down (positive direction)
                 let direction = if piece.color == PieceColor::White { -1 } else { 1 };
                 self.en_passant_target = Some(Position::new((from.rank as i32 + direction) as usize, from.file));
             }
@@ -114,8 +169,7 @@ impl Board {
 
             // Switch turns
             self.turn = self.turn.opposite();
-            self.move_count += 1;
-        }
+                }
     }
 
     pub fn get_valid_moves(&self, position: Position) -> Vec<ChessMove> {
@@ -147,35 +201,25 @@ impl Board {
     }
 
     fn get_pawn_moves(&self, position: Position, piece: Piece, moves: &mut Vec<ChessMove>) {
-        let direction = if piece.color == PieceColor::White { -1 } else { 1 };
-        
-        // Forward move
-        if let Some(forward) = position.offset(direction, 0) {
+                // White pawns move up (negative direction), Black pawns move down (positive direction)
+                // White pawns move up (negative direction), Black pawns move down (positive direction)
+                let direction = if piece.color == PieceColor::White { 1 } else { -1 };
+                
+                // Forward move (same file, different rank)
+                if let Some(forward) = position.offset(direction, 0) {
             if self.get_piece(forward).is_none() {
                 // Regular move
                 moves.push(ChessMove::new(position, forward));
                 
                 // Double move from starting position
-                let starting_rank = if piece.color == PieceColor::White { 6 } else { 1 };
+                // White pawns start at rank 6 (second row from bottom), Black at rank 1 (second row from top)
+                let starting_rank = if piece.color == PieceColor::White { 1 } else { 6 };
                 if position.rank == starting_rank {
                     if let Some(double_forward) = position.offset(direction * 2, 0) {
                         if self.get_piece(double_forward).is_none() {
                             moves.push(ChessMove::new(position, double_forward));
                         }
                     }
-                }
-                
-                // Promotion
-                let promotion_rank = if piece.color == PieceColor::White { 0 } else { 7 };
-                if forward.rank == promotion_rank {
-                    // Replace the regular move with promotion moves
-                    moves.pop(); // Remove the regular move
-                    
-                    // Add promotion options
-                    moves.push(ChessMove::with_promotion(position, forward, PieceType::Queen));
-                    moves.push(ChessMove::with_promotion(position, forward, PieceType::Rook));
-                    moves.push(ChessMove::with_promotion(position, forward, PieceType::Bishop));
-                    moves.push(ChessMove::with_promotion(position, forward, PieceType::Knight));
                 }
             }
         }
