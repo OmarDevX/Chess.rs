@@ -30,6 +30,6 @@ A simple and elegant chess game built using [Rust](https://www.rust-lang.org/) a
 Clone the repository and run it using Cargo:
 
 ```bash
-git clone https://github.com/OmarDevX/Chess.rs.
+git clone https://github.com/OmarDevX/Chess.rs.git
 cd rust-chess-egui
 cargo run
